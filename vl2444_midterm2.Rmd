@@ -1,0 +1,168 @@
+---
+title: "Vl2444 Midterm 2"
+author: "Vivian Liu"
+uni: vl2444
+date: "4/2/2020"
+output: html_document
+---
+
+```{r question 0}
+# I've read the honor code. Yes
+```
+
+```{r question 1.1: processing population data}
+# a)
+# country_pop <- read.csv('~/Desktop/Applied Statistical Computing/PSets/Data/API_SP.POP.TOTL_DS2_en_csv_v2_887275.csv', stringsAsFactors = FALSE)
+# The error is: Error in read.table(file = file, header = header, sep = sep, quote = quote, : more columns than column names
+
+# b)
+country_pop_char <- read.csv('~/Desktop/Applied Statistical Computing/PSets/Data/API_SP.POP.TOTL_DS2_en_csv_v2_887275.csv', skip=4)
+country_pop_char[1:5,]
+
+# c) 
+# 2019 as a column exists, but there is no data in it. The 2018 data would be better because the outbreak started in 2019, which would affect the population
+
+# d)
+countries <- country_pop_char$Country.Name
+pop_2018 <- country_pop_char$X2018
+pop <- data.frame(countries, pop_2018)
+head(pop)
+write.csv(pop, '~/Desktop/Applied Statistical Computing/PSets/Data/2018_pop_by_country.csv')
+```
+
+```{r question 1.2: processing death counts}
+deaths <- read.csv('~/Desktop/Applied Statistical Computing/PSets/Data/time_series_covid19_deaths_global.csv')
+deaths$Country.Region <-as.character(deaths$Country.Region)
+freq_countries <- as.data.frame(table(deaths$Country.Region))
+
+# a)
+multiples <- freq_countries[,1][which(freq_countries[,2] > 1)]
+multiples
+
+# b)
+dates <- grepl('.20', colnames(deaths))
+date_dat <- deaths[, dates]
+total_deaths <- aggregate(date_dat, deaths['Country.Region'], sum, na.rm=TRUE)
+head(total_deaths)
+
+# c)
+max_diff <- function(x) {
+  max(diff(x))
+}
+
+# d)
+biggest_diffs <- apply(total_deaths[,-1], 1, max_diff)
+
+# e)
+death_inc <- data.frame(countries=total_deaths[,1], biggest_diffs)
+head(death_inc)
+```
+
+```{r question 1.3: combining the population with the death counts}
+# a) use an outer join to combine the pop and death_inc datasets.
+pop_deaths <- merge(pop, death_inc, by='countries', all=TRUE)
+head(pop_deaths)
+
+# b)
+# There are 288 rows in the above dataframe. This matches neither, since I used an outer join. There are countries present in pop that are not present in death_inc, and vice versa, so there should be more rows than both pop and death_inc.
+
+# c)
+# R automatically fills those values with NA
+
+# d)
+ratio_death_pop <- function(x) {
+  if (!is.na(x[[2]]) && !is.na(x[[1]])) {
+    x[[2]]/x[[1]]
+  }
+  else {
+   NA 
+  }
+}
+ratios_death_pop <- apply(pop_deaths[,-1], 1, ratio_death_pop)
+max_ratio_index <- which.max(ratios_death_pop)
+country_greatest_ratio <- pop_deaths[,1][max_ratio_index]
+country_greatest_ratio
+# The country with the greatest ratio is San Marino. This is not really a country name; however, it was included in the countries column of death_inc so is included in this calcuation.
+```
+
+```{r question 1.4: plotting}
+# a)
+# The earliest date is 1/22/20
+countries <- c("US", "Canada")
+countries
+us_index <- which(total_deaths$Country.Region=="US")
+canada_index <- which(total_deaths$Country.Region=="Canada")
+us <- as.numeric(total_deaths[us_index, -1])
+us
+canada <- total_deaths[canada_index,-1]
+us_canada <- rbind(us, canada)
+us_canada
+
+# b)
+colors <- c("blue", "red")
+
+min_days <- 0
+max_days <- which(colnames(total_deaths) == "X3.31.20") - which(colnames(total_deaths) == "X1.22.20")
+y <- matrix(0:69, nrow=1, byrow=TRUE)
+
+plot(y, 
+     us,
+     xlab="Days Since 1/22/20", # e)
+     ylab="Deaths",
+     main="Deaths Per Day Since 1/22/20 in Canada and US: Exponential",
+     col="blue",
+     pch=19)
+
+points(y,
+       canada,
+       col="red",
+       pch=19)
+
+# d)
+legend("topleft", legend=paste(paste(countries, "= "), colors), fill=colors)
+
+# f) 
+# All data points are present
+```
+```{r question 2: wrangling NY Times article data}
+# a)
+library(jsonlite)
+articles <- read_json('~/Desktop/Applied Statistical Computing/PSets/Data/nytimes_article_search_20200401 (1).json')
+names(articles)
+# names are: status, copyright, response
+
+# names(articles$response)
+head(articles$response$docs[[10]]$word_count)
+# articles$response$docs
+# The column names we want are: word_count, section_name, pub_date, web_url, and main
+
+# format borrowed from HW4 solution
+q2_extraction<-function(appropriate_level){
+  # the "appropriate level" should be articles$response
+  var_names <- c("word_count", "section_name",
+                 "pub_date", "web_url", "main")
+  output=as.data.frame(matrix(NA, ncol=length(var_names), nrow=1))
+  names(output) <- var_names
+  output[1:4]=appropriate_level[var_names[1:4]]
+  output[5]=appropriate_level$headline[var_names[5]]
+  return(output)
+}
+
+# d)
+the_articles <- lapply(articles$response$docs, q2_extraction)
+final_df <- do.call(rbind, the_articles)
+final_df
+
+# c)
+as.numeric(final_df[,1])
+as.factor(final_df[,2])
+as.character((final_df[,3:5]))
+
+# e)
+dim(final_df)
+# There are 10 articles in the dataset
+  
+# f)
+write.csv(final_df, '~/Desktop/Applied Statistical Computing/PSets/Data/nytimesarticlesearch20200401.csv')
+```
+

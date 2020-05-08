@@ -1,0 +1,110 @@
+---
+title: "Pset6_vl2444"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r question 0}
+raw_data <- readLines('~/Desktop/Applied Statistical Computing/PSets/Data/USH00011084.raw.prcp')
+
+years <- as.numeric(substr(raw_data, 13, 16))
+
+months_abbrv <- strftime(strptime(paste(2020, 1:12, 10, sep="-"), "%Y-%m-%d"), "%b")
+month_data <- data.frame(matrix(ncol = 12, nrow = 98))
+colnames(month_data) <- months_abbrv
+
+for (i in 1:12) {
+  value <- substr(raw_data, 8 + i * 9, 16 + i * 9) 
+  value <- strsplit(gsub("[^0-9]+",",",value), split=",")
+  the_val <- as.numeric(sapply(value, "[[", 2)) / 10
+  month_data[i] <- as.numeric(the_val)
+}
+month_data$Jan
+
+final_data <- data.frame(years, month_data)
+final_data[final_data == 999.9] <- NA
+head(final_data)
+write.csv(final_data, '~/Desktop/Applied Statistical Computing/PSets/Data/USH00011084_prcp.csv', row.names=FALSE)
+```
+
+```{r question 1}
+# part 1
+means <- apply(final_data[,-1], 2, mean, na.rm=TRUE)
+medians <- apply(final_data[,-1], 2, median, na.rm=TRUE)
+m_m <- data.frame(means, medians)
+quantile_1 <- apply(final_data[,-1], 2, quantile, 0.25, na.rm=TRUE)
+m_m_1 <- data.frame(m_m, quantile_1)
+quantile_3 <- apply(final_data[,-1], 2, quantile, 0.75, na.rm=TRUE)
+prcp_stats <- data.frame(m_m_1, quantile_3)
+head(prcp_stats)
+
+# part 2
+total_by_year <- apply(final_data[,-1], 1, sum, na.rm=TRUE)
+totals <- data.frame(years, total_by_year)
+head(totals, 30)
+greatest_prcp <- totals[order(-total_by_year),]
+max_year <- greatest_prcp[1]
+head(greatest_prcp, 3)
+# The three years with greatest rainfall are 1975, 1995, and 1944.
+
+# part 3
+plot(totals$years,
+     totals$total_by_year,
+     main="Total Precipitation (mm) by Year",
+     xlab="Year",
+     ylab="Total Precipitation (mm)",
+     col="blue",
+     abline(v=1975),
+     pch=19)
+text(1975, 2300, label=2490.8)
+```
+
+```{r question 2}
+# part 1
+nyc_data <- read.csv('~/Desktop/Applied Statistical Computing/PSets/Data/nyc311_2018.csv')
+head(nyc_data, 20)
+nyc_data$created_date <- substr(nyc_data$created_date, 1, 10)
+dim(nyc_data)
+nyc_data$day_of_week <- weekdays(as.Date(nyc_data$created_date))
+head(nyc_data, 10)
+
+# part 2
+total <- nrow(nyc_data)
+week_days <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday")
+weekends <- c("Saturday", "Sunday")
+num_week_days <- sum(nyc_data$day_of_week %in% week_days)
+num_weekends <- sum(nyc_data$day_of_week %in% weekends)
+percent_weekday <- num_week_days / total
+percent_weekday
+# percent weekday: 75.98%
+percent_weekend <- num_weekends / total
+percent_weekend
+# percent weekend: 24.02%
+
+# part 3
+complaints <- as.data.frame(table(nyc_data$complaint_type))
+most_common<- complaints$Var1[which.max(complaints$Freq)]
+most_common
+# the most common complaint type is for "HEAT/HOT WATER", with 297246 complaints
+
+# part 4
+nyc_data$months <- strftime(strptime(nyc_data$created_date, "%Y-%m-%d"), "%m")
+head(nyc_data$months)
+comp_table <- tapply(nyc_data$complaint_type, nyc_data$months, table)
+the_months <- c()
+for (i in 1:12) {
+  the_months[i] <- comp_table[[i]][["HEAT/HOT WATER"]]
+}
+print(the_months)
+
+# part 5
+sample_data <- nyc_data[sample(nrow(nyc_data), 5000), ]
+plot(sample_data$longitude,
+     sample_data$latitude,
+     main="5000 Random Samples of Longitude vs Lattitude",
+     xlab="Longitude",
+     ylab="Latitude",
+     col= ifelse(nyc_data$complaint_type == "HEAT/HOT WATER", rgb(1, 0, 0, 0.1), rgb(0,0,0, 0.1)),
+     pch=19)
+```
